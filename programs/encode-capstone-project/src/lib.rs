@@ -1,10 +1,11 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::TokenAccount;
+use solana_program::pubkey::Pubkey;
+use solana_program::sys;
 
 declare_id!("2fEUszgesnJpufDjX3VzGzN8h1CMeAPyj1J6staE5hoZ");
 
 #[program]
-pub mod encode_capstone_project {
+pub mod apartment_dao {
     use super::*;
 
     #[state]
@@ -52,6 +53,7 @@ pub mod encode_capstone_project {
         #[account(init, payer = user, space = 8 + 8)]
         pub apartment_dao: Account<'info, ApartmentDAO>,
         pub user: Signer<'info>,
+        #[account("sysvar.programAccounts")]
         pub system_program: Program<sys::System>,
     }
 
@@ -59,6 +61,7 @@ pub mod encode_capstone_project {
     pub struct AddIssue<'info> {
         #[account(mut)]
         pub apartment_dao: Account<'info, ApartmentDAO>,
+        #[account("sysvar.programAccounts")]
         pub system_program: Program<sys::System>,
     }
 
@@ -66,6 +69,7 @@ pub mod encode_capstone_project {
     pub struct UpvoteIssue<'info> {
         #[account(mut)]
         pub apartment_dao: Account<'info, ApartmentDAO>,
+        #[account("sysvar.programAccounts")]
         pub system_program: Program<sys::System>,
     }
 
@@ -73,6 +77,7 @@ pub mod encode_capstone_project {
     pub struct ResolveIssue<'info> {
         #[account(mut)]
         pub apartment_dao: Account<'info, ApartmentDAO>,
+        #[account("sysvar.programAccounts")]
         pub system_program: Program<sys::System>,
     }
 
@@ -90,4 +95,3 @@ pub mod encode_capstone_project {
         Resolved,
     }
 }
-
