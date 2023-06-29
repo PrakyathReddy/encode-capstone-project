@@ -1,97 +1,107 @@
 use anchor_lang::prelude::*;
-use solana_program::pubkey::Pubkey;
-use solana_program::sys;
+use anchor_spl::token::{TokenAccount, Mint, Token};
+use anchor_lang::solana_program::entrypoint::ProgramResult;
+use mpl_token_metadata::{
+    state::{Metadata, TokenMetadataAccount, PREFIX, EDITION},
+    ID as metadata_program_id,
+};
 
-declare_id!("2fEUszgesnJpufDjX3VzGzN8h1CMeAPyj1J6staE5hoZ");
+declare_id!("8p4SQHSagBPXu5S35TELTMEgstfgfYNxmETKjbEYXuvo");
 
 #[program]
-pub mod apartment_dao {
+mod appartment_dao {
     use super::*;
+    
+    pub fn verify_nft(ctx: Context<VerifyNft>) -> ProgramResult {
 
-    #[state]
-    pub struct ApartmentDAO {
-        pub issues: Vec<Issue>,
-        pub voting_rights: Vec<Pubkey>,
-        pub corpus_fund: Pubkey,
-    }
+        let nft_token_account = &ctx.accounts.nft_token_account;
+        let user = &ctx.accounts.user;
+        let nft_mint_account = &ctx.accounts.nft_mint;
 
-    impl ApartmentDAO {
-        pub fn new(ctx: Context<CreateApartmentDAO>, corpus_fund: Pubkey) -> ProgramResult {
-            let apartment_dao = &mut ctx.accounts.apartment_dao;
-            apartment_dao.issues = Vec::new();
-            apartment_dao.voting_rights = Vec::new();
-            apartment_dao.corpus_fund = corpus_fund;
-            Ok(())
+        assert_eq!(nft_token_account.owner, user.key());
+        assert_eq!(nft_token_account.mint, nft_mint_account.key());
+        assert_eq!(nft_token_account.amount, 1);
+
+        let master_edition_seed  = &[
+            PREFIX.as_bytes(),
+            ctx.accounts.nft_metadata_account.key.as_ref(),
+            nft_token_account.mint.as_ref(),
+            EDITION.as_bytes()
+        ];
+
+        // let (master_edition_key, master_edition_seed) = 
+        //     Pubkey::find_program_address(
+        //         master_edition_seed, 
+        //         ctx.accounts.nft_metadata_account.key
+        //     );
+
+        // assert_eq!(master_edition_key, ctx.accounts.creature_edition.key());
+
+        // if ctx.accounts.creature_edition.data_is_empty() {
+        //     return Err(ErrorCode::NotInitialized.into());
+        // };
+
+        let nft_metadata_account = &ctx.accounts.nft_metadata_account;
+        let nft_mint_account_pubkey = ctx.accounts.nft_mint.key();
+
+        //seeds for PDA
+        let metadata_seed = &[
+            "metadata".as_bytes(),
+            nft_metadata_account.key.as_ref(),
+            nft_mint_account_pubkey.as_ref(),
+        ];
+
+        //The derived key
+        let (metadata_derived_key, _bumb_seed) = 
+            Pubkey::find_program_address(
+                metadata_seed,
+                nft_metadata_account.key
+            );
+
+        //check that the derived key is the current metadata account key
+        assert_eq!(metadata_derived_key, nft_metadata_account.key());
+
+        //check if initialized
+        if nft_metadata_account.data_is_empty() {
+            return Err(ErrorCode::);
         }
 
-        pub fn add_issue(ctx: Context<AddIssue>, description: String) -> ProgramResult {
-            let apartment_dao = &mut ctx.accounts.apartment_dao;
-            let issue = Issue {
-                description,
-                upvotes: 0,
-                status: IssueStatus::InQueue,
-            };
-            apartment_dao.issues.push(issue);
-            Ok(())
-        }
+        //Get the metadata account struct so we can access its values
+        let metadata_full_account =
+            &mut Metadata::from_account_info(&ctx.accounts.nft_metadata_account)?;
 
-        pub fn upvote_issue(ctx: Context<UpvoteIssue>, issue_index: u32) -> ProgramResult {
-            let apartment_dao = &mut ctx.accounts.apartment_dao;
-            apartment_dao.issues[issue_index as usize].upvotes += 1;
-            Ok(())
-        }
+        let full_metadata_clone = metadata_full_account.clone();
 
-        pub fn resolve_issue(ctx: Context<ResolveIssue>, issue_index: u32) -> ProgramResult {
-            let apartment_dao = &mut ctx.accounts.apartment_dao;
-            apartment_dao.issues[issue_index as usize].status = IssueStatus::Resolved;
-            Ok(())
-        }
+        let expected_creator = 
+            Pubkey::from_str("FNfZnXe6VpaEwyZez1kwtHfMgNrtPtzumtxsUysYxLEP").unwrap();
+
+        //make sure expected creator is present in metadata
+        assert_eq!(
+            full_metadata_clone.data.creators.as_ref().unwrap()[0].address,
+            expected_creator
+        );
+
+        if !full_metadata_clone.data.creator.unwrap()[0].verified {
+            // returns some error as the expected creator is not verified
+            return Err(ErrorCode::AlreadyVerified.into());
+        };
+        
     }
+}
 
-    #[derive(Accounts)]
-    pub struct CreateApartmentDAO<'info> {
-        #[account(init, payer = user, space = 8 + 8)]
-        pub apartment_dao: Account<'info, ApartmentDAO>,
-        pub user: Signer<'info>,
-        #[account("sysvar.programAccounts")]
-        pub system_program: Program<sys::System>,
-    }
+#[derive(Accounts)]
+pub struct VerifyNft<'info> {
 
-    #[derive(Accounts)]
-    pub struct AddIssue<'info> {
-        #[account(mut)]
-        pub apartment_dao: Account<'info, ApartmentDAO>,
-        #[account("sysvar.programAccounts")]
-        pub system_program: Program<sys::System>,
-    }
+    // The owner of NFT
+    pub user: Signer<'info>,
 
-    #[derive(Accounts)]
-    pub struct UpvoteIssue<'info> {
-        #[account(mut)]
-        pub apartment_dao: Account<'info, ApartmentDAO>,
-        #[account("sysvar.programAccounts")]
-        pub system_program: Program<sys::System>,
-    }
+    //The mint account of NFT
+    pub nft_mint: Account<'info, Mint>,
 
-    #[derive(Accounts)]
-    pub struct ResolveIssue<'info> {
-        #[account(mut)]
-        pub apartment_dao: Account<'info, ApartmentDAO>,
-        #[account("sysvar.programAccounts")]
-        pub system_program: Program<sys::System>,
-    }
+    //The assosiated token account that hold the NFT for the user 
+    pub nft_token_account: Account<'info, TokenAccount>,
 
-    #[account]
-    pub struct Issue {
-        pub description: String,
-        pub upvotes: u32,
-        pub status: IssueStatus,
-    }
-
-    #[derive(Copy, Clone, Debug, AnchorSerialize, AnchorDeserialize)]
-    pub enum IssueStatus {
-        InQueue,
-        WIP,
-        Resolved,
-    }
+    // The metadata account of the NFT
+    #[account(address = metadata_program_id)]
+    pub nft_metadata_account: AccountInfo<'info>,
 }
