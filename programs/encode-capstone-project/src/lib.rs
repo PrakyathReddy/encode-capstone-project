@@ -1,3 +1,10 @@
+use anchor_lang::prelude::*;
+use anchor_spl::token::{Mint, TokenAccount};
+use mpl_token_metadata::{
+    state::{Metadata, TokenMetadataAccount, EDITION, PREFIX},
+    ID as metadata_program_id,
+};
+
 declare_id!("8p4SQHSagBPXu5S35TELTMEgstfgfYNxmETKjbEYXuvo");
 
 #[program]
@@ -13,12 +20,12 @@ mod appartment_dao {
         assert_eq!(nft_token_account.mint, nft_mint_account.key());
         assert_eq!(nft_token_account.amount, 1);
 
-        let master_edition_seed = &[
-            PREFIX.as_bytes(),
-            ctx.accounts.nft_metadata_account.key.as_ref(),
-            nft_token_account.mint.as_ref(),
-            EDITION.as_bytes(),
-        ];
+        // let master_edition_seed  = &[
+        //     PREFIX.as_bytes(),
+        //     ctx.accounts.nft_metadata_account.key.as_ref(),
+        //     nft_token_account.mint.as_ref(),
+        //     EDITION.as_bytes()
+        // ];
 
         // let (master_edition_key, master_edition_seed) =
         //     Pubkey::find_program_address(
@@ -61,8 +68,9 @@ mod appartment_dao {
         let full_metadata_clone = metadata_full_account.clone();
 
         use solana_program::{pubkey, pubkey::Pubkey};
-        let expected_creator =
-            Pubkey::from_str("FNfZnXe6VpaEwyZez1kwtHfMgNrtPtzumtxsUysYxLEP").unwrap();
+        let expected_creator = pubkey!("FNfZnXe6VpaEwyZez1kwtHfMgNrtPtzumtxsUysYxLEP");
+
+        // Pubkey::from_str("FNfZnXe6VpaEwyZez1kwtHfMgNrtPtzumtxsUysYxLEP").unwrap();
 
         //make sure expected creator is present in metadata
         assert_eq!(
@@ -70,9 +78,10 @@ mod appartment_dao {
             expected_creator
         );
 
-        if !full_metadata_clone.data.creator.unwrap()[0].verified {
+        if !full_metadata_clone.data.creators.unwrap()[0].verified {
             // returns some error as the expected creator is not verified
-            return Err(ErrorCode::AlreadyVerified.into());
+            //            return Err(ErrorCode::AlreadyVerified.into());
+            return err!(NftError::DataTooLarge);
         };
 
         Ok(())
