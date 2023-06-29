@@ -1,111 +1,156 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, TokenAccount};
-use mpl_token_metadata::{
-    state::{Metadata, TokenMetadataAccount, EDITION, PREFIX},
-    ID as metadata_program_id,
-};
 
-declare_id!("8p4SQHSagBPXu5S35TELTMEgstfgfYNxmETKjbEYXuvo");
+declare_id!("BfL4d7RJNYD7gceqRt1SWyped4goq3wCdHpqG3JsAPhh");
+
+#[constant]
+pub const USER_SEED: &[u8] = b"user";
+
+#[constant]
+pub const ISSUE_SEED: &[u8] = b"issue";
+
+#[constant]
+pub const VOTE_SEED: &[u8] = b"vote";
 
 #[program]
 mod appartment_dao {
     use super::*;
 
-    pub fn verify_nft(ctx: Context<VerifyNft>) -> Result<()> {
-        let nft_token_account = &ctx.accounts.nft_token_account;
-        let user = &ctx.accounts.user;
-        let nft_mint_account = &ctx.accounts.nft_mint;
+    // Instructions ////////////////////////////////////////////////////////////////////////////////////
 
-        assert_eq!(nft_token_account.owner, user.key());
-        assert_eq!(nft_token_account.mint, nft_mint_account.key());
-        assert_eq!(nft_token_account.amount, 1);
+    pub fn initialize_new_user(ctx: Context<Initialize>, name: String) -> Result<()> {
+        //here we have to verify that the user hold our NFT | this is WIP
 
-        // let master_edition_seed  = &[
-        //     PREFIX.as_bytes(),
-        //     ctx.accounts.nft_metadata_account.key.as_ref(),
-        //     nft_token_account.mint.as_ref(),
-        //     EDITION.as_bytes()
-        // ];
+        let new_account = &mut ctx.accounts.new_account;
+        let signer = &mut ctx.accounts.signer;
 
-        // let (master_edition_key, master_edition_seed) =
-        //     Pubkey::find_program_address(
-        //         master_edition_seed,
-        //         ctx.accounts.nft_metadata_account.key
-        //     );
+        new_account.name = name;
+        new_account.issue_count = 0;
+        new_account.signer = signer.key();
 
-        // assert_eq!(master_edition_key, ctx.accounts.creature_edition.key());
+        Ok(())
+    }
 
-        // if ctx.accounts.creature_edition.data_is_empty() {
-        //     return Err(ErrorCode::NotInitialized.into());
-        // };
+    pub fn add_new_issue(ctx: Context<CreatePost>, title: String, content: String) -> Result<()> {
+        let issue_account = &mut ctx.accounts.issue_account;
+        let user_account = &mut ctx.accounts.user_account;
+        let signer = &mut ctx.accounts.signer;
 
-        let nft_metadata_account = &ctx.accounts.nft_metadata_account;
-        let nft_mint_account_pubkey = ctx.accounts.nft_mint.key();
+        issue_account.title = title;
+        issue_account.content = content;
+        issue_account.signer = signer.key();
+        issue_account.up_votes = 0;
+        issue_account.down_votes = 0;
 
-        //seeds for PDA
-        let metadata_seed = &[
-            "metadata".as_bytes(),
-            nft_metadata_account.key.as_ref(),
-            nft_mint_account_pubkey.as_ref(),
-        ];
+        user_account.issue_count = user_account.issue_count.checked_add(1).unwrap();
+        Ok(())
+    }
 
-        //The derived key
-        let (metadata_derived_key, _bumb_seed) =
-            Pubkey::find_program_address(metadata_seed, nft_metadata_account.key);
+    pub fn vote_for_issue(ctx: Context<CastVote>, vote: u8) -> Result<()> {
+        let issue_account = &mut ctx.accounts.issue_account;
+        let vote_account = &mut ctx.accounts.vote_account;
+        let user_account = &mut ctx.accounts.user_account;
 
-        //check that the derived key is the current metadata account key
-        assert_eq!(metadata_derived_key, nft_metadata_account.key());
+        vote_account.issue = issue_account.key();
+        vote_account.voter = user_account.key();
 
-        //check if initialized
-        if nft_metadata_account.data_is_empty() {
-            return err!(NftError::DataTooLarge);
+        if vote == 1 {
+            vote_account.vote = vote;
+            issue_account.up_votes = issue_account.up_votes.checked_add(1).unwrap();
         }
 
-        //Get the metadata account struct so we can access its values
-        let metadata_full_account =
-            &mut Metadata::from_account_info(&ctx.accounts.nft_metadata_account)?;
-
-        let full_metadata_clone = metadata_full_account.clone();
-
-        use solana_program::{pubkey, pubkey::Pubkey};
-        let expected_creator = pubkey!("FNfZnXe6VpaEwyZez1kwtHfMgNrtPtzumtxsUysYxLEP");
-
-        // Pubkey::from_str("FNfZnXe6VpaEwyZez1kwtHfMgNrtPtzumtxsUysYxLEP").unwrap();
-
-        //make sure expected creator is present in metadata
-        assert_eq!(
-            full_metadata_clone.data.creators.as_ref().unwrap()[0].address,
-            expected_creator
-        );
-
-        if !full_metadata_clone.data.creators.unwrap()[0].verified {
-            // returns some error as the expected creator is not verified
-            //            return Err(ErrorCode::AlreadyVerified.into());
-            return err!(NftError::DataTooLarge);
-        };
+        if vote == 0 {
+            vote_account.vote = vote;
+            issue_account.down_votes = issue_account.down_votes.checked_add(1).unwrap();
+        }
 
         Ok(())
     }
 }
 
+// CONTEXTS ////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Accounts)]
-pub struct VerifyNft<'info> {
-    // The owner of NFT
-    pub user: Signer<'info>,
-
-    //The mint account of NFT
-    pub nft_mint: Account<'info, Mint>,
-
-    //The assosiated token account that hold the NFT for the user
-    pub nft_token_account: Account<'info, TokenAccount>,
-
-    // The metadata account of the NFT
-    #[account(address = metadata_program_id)]
-    pub nft_metadata_account: AccountInfo<'info>,
+pub struct Initialize<'info> {
+    #[account(
+        init,
+        seeds = [USER_SEED, signer.key().as_ref()],
+        bump,
+        payer = signer,
+        space = 8 + 250
+    )]
+    pub new_account: Account<'info, DAOUser>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
-#[error_code]
-pub enum NftError {
-    #[msg("MyAccount may only hold data below 100")]
-    DataTooLarge,
+#[derive(Accounts)]
+pub struct CreatePost<'info> {
+    #[account(
+        init,
+        seeds = [ISSUE_SEED, signer.key().as_ref(),&[user_account.issue_count as u8].as_ref()],
+        bump,
+        payer = signer,
+        space = 8 + 200 + 200 + 2 + 2
+    )]
+    pub issue_account: Account<'info, NewIssue>,
+
+    #[account(
+        mut,
+        seeds = [USER_SEED, signer.key().as_ref()],
+        bump,
+        has_one = signer
+    )]
+    pub user_account: Account<'info, DAOUser>,
+
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CastVote<'info> {
+    #[account(
+        init,
+        seeds = [VOTE_SEED ,issue_account.key().as_ref(), signer.key().as_ref()],
+        bump,
+        payer = signer,
+        space = 8 + 32 + 32 + 1
+    )]
+    pub vote_account: Account<'info, Vote>,
+
+    #[account(mut)]
+    pub issue_account: Account<'info, NewIssue>,
+
+    #[account(mut)]
+    pub user_account: Account<'info, DAOUser>,
+
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// PDAs //////////////////////////////////////////////////////////////////////////////////////////////
+
+#[account]
+pub struct DAOUser {
+    pub name: String,
+    pub issue_count: u8,
+    pub signer: Pubkey,
+}
+
+#[account]
+pub struct NewIssue {
+    pub title: String,
+    pub content: String,
+    pub signer: Pubkey,
+    pub up_votes: u16,
+    pub down_votes: u16,
+}
+
+#[account]
+pub struct Vote {
+    pub issue: Pubkey,
+    pub voter: Pubkey,
+    pub vote: u8,
 }
