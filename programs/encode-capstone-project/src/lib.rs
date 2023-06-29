@@ -38,14 +38,15 @@ mod appartment_dao {
         issue_account.title = title;
         issue_account.content = content;
         issue_account.signer = signer.key();
-        issue_account.up_votes = 0;
-        issue_account.down_votes = 0;
+        // issue_account.up_votes = 0;
+        // issue_account.down_votes = 0;
 
         user_account.issue_count = user_account.issue_count.checked_add(1).unwrap();
         Ok(())
     }
 
-    pub fn vote_for_issue(ctx: Context<CastVote>, vote: u8) -> Result<()> {
+    // pub fn vote_for_issue(ctx: Context<CastVote>, vote: u8) -> Result<()> {
+    pub fn vote_for_issue(ctx: Context<CastVote>) -> Result<()> {
         let issue_account = &mut ctx.accounts.issue_account;
         let vote_account = &mut ctx.accounts.vote_account;
         let user_account = &mut ctx.accounts.user_account;
@@ -53,15 +54,17 @@ mod appartment_dao {
         vote_account.issue = issue_account.key();
         vote_account.voter = user_account.key();
 
-        if vote == 1 {
-            vote_account.vote = vote;
-            issue_account.up_votes = issue_account.up_votes.checked_add(1).unwrap();
-        }
+        issue_account.votes = issue_account.votes.checked_add(1).unwrap();
 
-        if vote == 0 {
-            vote_account.vote = vote;
-            issue_account.down_votes = issue_account.down_votes.checked_add(1).unwrap();
-        }
+        // if vote == 1 {
+        //     vote_account.vote = vote;
+        //     issue_account.up_votes = issue_account.up_votes.checked_add(1).unwrap();
+        // }
+        //
+        // if vote == 0 {
+        //     vote_account.vote = vote;
+        //     issue_account.down_votes = issue_account.down_votes.checked_add(1).unwrap();
+        // }
 
         Ok(())
     }
@@ -144,13 +147,14 @@ pub struct NewIssue {
     pub title: String,
     pub content: String,
     pub signer: Pubkey,
-    pub up_votes: u16,
-    pub down_votes: u16,
+    pub votes: u16,
+    //pub up_votes: u16,
+    //pub down_votes: u16,
 }
 
 #[account]
 pub struct Vote {
     pub issue: Pubkey,
     pub voter: Pubkey,
-    pub vote: u8,
+    //pub vote: u8,
 }
