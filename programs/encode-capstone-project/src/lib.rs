@@ -91,7 +91,7 @@ pub struct Initialize<'info> {
 pub struct CreatePost<'info> {
     #[account(
         init,
-        seeds = [ISSUE_SEED, signer.key().as_ref(),&[user_account.issue_count as u8].as_ref()],
+        seeds = [ISSUE_SEED, signer.key().as_ref(),[user_account.issue_count].as_ref()],
         bump,
         payer = signer,
         space = 8 + 200 + 200 + 2 + 2
