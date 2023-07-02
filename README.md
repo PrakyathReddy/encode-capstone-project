@@ -1,4 +1,4 @@
-# encode-capstone-project
+# APARTMENT DAO
 
 Apartment DAO
 
