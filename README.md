@@ -1,4 +1,4 @@
-# APARTMENT DAO
+# NestWorks DAO
 
 Let’s say there’s a large gated community with over 1000 apartments. There are maintenance issues every now and then, such as fixing broken pipes, elevators not working, garbage collection issues, etc. How do we address these issues?
 
